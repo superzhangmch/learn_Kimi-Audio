@@ -113,16 +113,16 @@ class KimiAudio(object):
         ):
             audio_logits, text_logits, past_key_values = self.alm.forward(
                 input_ids=decoder_input_audio_ids,
-                text_input_ids=decoder_input_text_ids,
-                whisper_input_feature=decoder_input_whisper_feature,
+                text_input_ids=decoder_input_text_ids,               # i > 1 时，只有一个元素。 i=0时，为 user input 中 text ids，有多个元素。
+                whisper_input_feature=decoder_input_whisper_feature, # i = 0时是 user input 中的 audio 的 whisper 特征。 i > 1 时（也就是接龙生成时），为 None
                 is_continuous_mask=decoder_is_continuous_mask,
-                position_ids=decoder_position_ids,
+                position_ids=decoder_position_ids,                   # 为 1D 位置编码 id
                 past_key_values=past_key_values,
                 return_dict=False,
             )
 
             # Sample text token using the sampler
-            next_token_text = sampler.sample_text_logits(
+            next_token_text = sampler.sample_text_logits( # 指的是从 softmax 概率中作采样
                 text_logits, recent_tokens=text_previous_tokens[:i] if i > 0 else None
             )
 
@@ -132,7 +132,7 @@ class KimiAudio(object):
             )
 
             if text_stream_is_finished:
-                next_token_text.fill_(self.extra_tokens.kimia_text_blank)
+                next_token_text.fill_(self.extra_tokens.kimia_text_blank) # 当 text 已经生成结束。则补空即可，这时候就让 audio 慢慢生成好了
             elif next_token_text.item() == self.extra_tokens.kimia_text_eos:
                 text_stream_is_finished = True
             else:
@@ -140,7 +140,7 @@ class KimiAudio(object):
 
             text_previous_tokens[i : i + 1] = next_token_text
 
-            if i < self.kimia_text_audiodelaytokens:
+            if i < self.kimia_text_audiodelaytokens: # kimia_text_audiodelaytokens == 6，也就是先等生成 6 个 text token后才生成 audio tokens
                 next_audio_token.fill_(self.extra_tokens.kimia_text_blank)
             else:
                 if output_type == "text":
@@ -153,11 +153,10 @@ class KimiAudio(object):
             audio_stream_is_finished = next_audio_token.item() in self.eod_ids
 
             if (
-                output_type == "text"
-                and text_stream_is_finished
-                or output_type == "both"
-                and audio_stream_is_finished
-            ):
+                output_type == "text" and text_stream_is_finished
+                or 
+                output_type == "both" and audio_stream_is_finished
+            ): # 生成结束
                 return_text_tokens = (
                     text_previous_tokens[:valid_text_length]
                     .detach()
@@ -176,13 +175,15 @@ class KimiAudio(object):
                     .tolist()
                 )
                 return return_audio_tokens, return_text_tokens
-            else:
-                decoder_input_audio_ids = next_audio_token.unsqueeze(1)
-                decoder_input_text_ids = next_token_text.unsqueeze(1)
-
+            else: # 仍处于接龙生成阶段
+                decoder_input_audio_ids = next_audio_token.unsqueeze(1) # 接龙生成阶段，生成的一个 audio token
+                decoder_input_text_ids = next_token_text.unsqueeze(1)   # 接龙生成阶段，生成的一个 text token
+                # 因为是接龙生成，所以 decoder_input_audio_ids，decoder_input_text_ids 会用于下一 step
+                # text 和 audio 是同步生成的，但是audio会延迟6个token，且对于同样内容， text tokens 数量比 audio tokens 少，所以 audio 生成的时候，其实也是在照着 text 内容 "读".
+                
                 decoder_position_ids = (
                     torch.zeros(1, 1, device=torch.cuda.current_device())
-                    .fill_(last_position_id + 1)
+                    .fill_(last_position_id + 1) # pos id 递增一
                     .long()
                     .view(1, 1)
                 )
@@ -227,6 +228,10 @@ class KimiAudio(object):
 
         assert output_type in ["text", "both"]
 
+        # chats 长类似这样： 
+        #   [{'role': 'user', 'message_type': 'audio', 'content': 'xxx.wav'}, 
+        #    {'role': 'user', 'message_type': 'text', 'content': "waht's your name? and please answer my above question"}]
+        
         history = self.prompt_manager.get_prompt(chats, output_type=output_type)
 
         audio_input_ids, text_input_ids, is_continuous_mask = history.to_tensor()
@@ -270,10 +275,13 @@ class KimiAudio(object):
         generated_wav_tokens = torch.tensor(generated_wav_tokens).unsqueeze(0)
         generated_wav_tokens = generated_wav_tokens - self.kimia_token_offset
 
+        # text token ids => text
         generated_text_tokens = [
             t for t in generated_text_tokens if t < self.kimia_token_offset
         ]
         generated_text = self.detokenize_text(generated_text_tokens)
+
+        # audio token ids => audio
         if self.detokenizer is not None and output_type == "both":
             generated_wav = self.detokenize_audio(generated_wav_tokens)
         else:
