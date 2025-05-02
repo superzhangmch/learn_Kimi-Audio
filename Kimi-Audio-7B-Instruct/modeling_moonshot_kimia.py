@@ -697,9 +697,7 @@ class MoonshotKimiaModel(Qwen2PreTrainedModel):
                     whisper_input_feature_i = whisper_input_feature[idx].squeeze(0)
                     idx += 1
                     #assert feat_len == is_continuous_mask[seg_idx].sum()
-                    expanded_whisper[start_idx + 1 : end_idx, :] = (
-                        whisper_input_feature_i[:feat_len, :]
-                    )
+                    expanded_whisper[start_idx + 1 : end_idx, :] = whisper_input_feature_i[:feat_len, :] # 原本全是0，这里把对应到音频的地方，放置 whisper feature
 
                 expanded_whisper = expanded_whisper.unsqueeze(0)
                 whisper_emb = self.vq_adaptor(
@@ -710,16 +708,15 @@ class MoonshotKimiaModel(Qwen2PreTrainedModel):
                 whisper_emb = whisper_emb * is_continuous_mask[:, :, None]
 
                 encoder_input_addwith_discrete_token = (
-                    audio_emb + whisper_emb
+                    audio_emb + whisper_emb # 加上 whisper 特征
                 ) * torch.sqrt(
                     torch.tensor(
                         2.0, dtype=whisper_emb.dtype, device=torch.cuda.current_device()
                     )
                 )
                 audio_emb = (
-                    audio_emb * (~is_continuous_mask[:, :, None])
-                    + encoder_input_addwith_discrete_token
-                    * is_continuous_mask[:, :, None]
+                     audio_emb * (~is_continuous_mask[:, :, None])                           # 非音频部分，不动
+                     + encoder_input_addwith_discrete_token * is_continuous_mask[:, :, None] # 音频部分，替换
                 )
             if text_input_ids is not None and text_input_ids.sum() != 0:
                 inputs_embeds = audio_emb + self.embed_tokens(text_input_ids)
