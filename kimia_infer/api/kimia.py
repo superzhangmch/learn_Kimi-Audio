@@ -100,7 +100,14 @@ class KimiAudio(object):
             .long()
         )
         decoder_input_whisper_feature = continous_feature
-        decoder_is_continuous_mask = is_continuous_mask
+        decoder_is_continuous_mask = is_continuous_mask 
+        '''
+        is_continuous_mask 长这样： tensor([[False, False, False, False, False, False, False, False, False,  True, True,  True,  True,  True,  True,  True,  True,  True,  True,  True,
+                                            True,  True,  True,  True,  True,  True,  True,  True,  True,  True, True,  True,  True,  True,  True,  True,  True,  True,  True,  True,
+                                            True,  True,  True,  True,  True,  True,  True,  True,  True,  True, True,  True,  True,  True,  True,  True,  True, False, False, False,
+                                            False, False, False, False, False]], device='cuda:0')
+            指示了每个 time 位置是音频还是 text
+         ''' 
         past_key_values = None
 
         last_position_id = decoder_input_audio_ids.shape[1] - 1
