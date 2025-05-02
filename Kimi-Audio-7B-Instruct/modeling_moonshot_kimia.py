@@ -1,6 +1,8 @@
 # coding=utf-8
 # Copyright 2025 The Moonshot AI Team, Qwen Team, and HuggingFace Inc. team. All rights reserved.
-# 
+# ==========
+# 这个文件是从 modelscope 的文件中扣出来的（https://modelscope.cn/models/moonshotai/Kimi-Audio-7B-Instruct/files）
+# ==========
 # The code is based on Qwen2.5-7B, but modified for KimiAudio.
 #
 # Licensing Information:
@@ -665,12 +667,12 @@ class MoonshotKimiaModel(Qwen2PreTrainedModel):
             )
             position_ids = position_ids.unsqueeze(0)
 
-        if inputs_embeds is None:
+        if inputs_embeds is None: # 正常 inference 时，inputs_embeds 都是 None
             # shape: batch, seq_len, hidden_size
             input_ids = input_ids.to(torch.cuda.current_device())
             text_input_ids = text_input_ids.to(torch.cuda.current_device())
             audio_emb = self.embed_tokens(input_ids)
-            if self.use_whisper_feature and whisper_input_feature is not None:
+            if self.use_whisper_feature and whisper_input_feature is not None and len(whisper_input_feature) > 0:
                 if not isinstance(whisper_input_feature, list):
                     whisper_input_feature = whisper_input_feature.squeeze(0)
                     whisper_input_feature = [whisper_input_feature]
@@ -680,7 +682,7 @@ class MoonshotKimiaModel(Qwen2PreTrainedModel):
                 # shape: batch, seq_len, hidden_size
                 whisper_input_dim = whisper_input_feature[0].shape[-1]
                 whisper_dtype = whisper_input_feature[0].dtype
-                expanded_whisper = (
+                expanded_whisper = ( # expanded_whisper 长度和 input_ids 一样
                     torch.zeros(audio_emb.shape[1], whisper_input_dim)
                     .to(torch.cuda.current_device())
                     .to(whisper_dtype)
@@ -727,6 +729,7 @@ class MoonshotKimiaModel(Qwen2PreTrainedModel):
         # TODO kill attention_mask for prefill
         padding_mask = attention_mask
 
+        # inputs_embeds 会作为 transformer 的 input。 inputs_embeds 由 inputs_id, text_input_ids, whisper_feature 三部分求和得到
         hidden_states = inputs_embeds
 
         # decoder layers
@@ -751,7 +754,7 @@ class MoonshotKimiaModel(Qwen2PreTrainedModel):
             )
 
             hidden_states = layer_outputs[0]
-            if idx == self.kimia_mimo_transformer_from_layer_index:
+            if idx == self.kimia_mimo_transformer_from_layer_index: # kimia_mimo_transformer_from_layer_index == 21
                 mimo_hidden_states = hidden_states.clone()
 
             if use_cache:
@@ -765,7 +768,7 @@ class MoonshotKimiaModel(Qwen2PreTrainedModel):
             all_hidden_states += (hidden_states,)
 
         # apply audio transformer layers
-        for idx, decoder_layer in enumerate(self.mimo_layers):
+        for idx, decoder_layer in enumerate(self.mimo_layers): # self.layers 是28层，第21层开始分叉，self.mimo_layers 是 6 层
             if output_hidden_states:
                 all_hidden_states += (mimo_hidden_states,)
 
@@ -775,7 +778,7 @@ class MoonshotKimiaModel(Qwen2PreTrainedModel):
                 else None
             )
             layer_outputs = decoder_layer(
-                mimo_hidden_states,
+                mimo_hidden_states, # mimo_hidden_states 是从 self.layers 的第 21 层开始接着往下走的
                 attention_mask=attention_mask,
                 position_ids=position_ids,
                 past_key_value=past_key_value,
