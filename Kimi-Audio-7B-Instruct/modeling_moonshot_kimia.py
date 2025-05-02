@@ -720,6 +720,11 @@ class MoonshotKimiaModel(Qwen2PreTrainedModel):
                 )
             if text_input_ids is not None and text_input_ids.sum() != 0:
                 inputs_embeds = audio_emb + self.embed_tokens(text_input_ids)
+                '''
+                input_ids 和 text_input_ids 的区别：input_ids 放的是 audio token ids, text_input_ids 放的是 text token ids
+                - 对于 prompt prefill 部分：input_ids.length == text_input_ids.length >= 1 , 且同一个位置，只有一者有效，另一者是 blank 特殊token
+                - 生成时，input_ids.length == text_input_ids.length == 1，二者不再互斥，都可能是非 blank 的有效值。但是因为text 先生成结束，这之后，text_input_ids 就只有 blank token 了
+                '''
             else:
                 inputs_embeds = audio_emb
         # embed positions
