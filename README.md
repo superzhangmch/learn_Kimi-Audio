@@ -1,3 +1,9 @@
+核心代码：
+<ul>
+    <li>https://github.com/superzhangmch/learn_Kimi-Audio/blob/master/kimia_infer/api/kimia.py</li>
+    <li>https://github.com/superzhangmch/learn_Kimi-Audio/blob/master/Kimi-Audio-7B-Instruct/modeling_moonshot_kimia.py</li> 
+</ul>
+<hr>
 <p align="center">
     <img src="assets/kimia_logo.png" width="400"/>
 <p>
