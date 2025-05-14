@@ -48,6 +48,19 @@ class KimiAudio(object):
         self.kimia_text_audiodelaytokens = 6
         self.eod_ids = [self.extra_tokens.msg_end, self.extra_tokens.media_end]
 
+    # <<< 下面两个 测试不经过 LLM，直接 audio => speech_id => mel_spetrum => wav
+    def tokenize_audio_init(self):
+        from kimia_infer.models.tokenizer.glm4_tokenizer import Glm4Tokenizer
+        self.audio_tokenizer = Glm4Tokenizer("THUDM/glm-4-voice-tokenizer")
+        self.audio_tokenizer = self.audio_tokenizer.to(torch.cuda.current_device())
+
+    def tokenize_audio(self, wav_path):
+        wav_tokens = self.audio_tokenizer.tokenize(audio_path=wav_path)
+        # wav_tokens = wav_tokens + self.kimia_token_offset # 152064
+        wav_tokens_list = wav_tokens.squeeze(0).cpu().numpy().tolist()
+        return wav_tokens_list
+    # >>>
+    
     @torch.inference_mode()
     def _generate_loop(
         self,
