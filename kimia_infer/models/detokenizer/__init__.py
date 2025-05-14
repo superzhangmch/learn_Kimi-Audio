@@ -150,6 +150,7 @@ class PrefixStreamingFlowMatchingDetokenizer:
         if self.look_ahead_tokens != 0 and self.previous_chunk_left is None:
             self.previous_chunk_left = {"semantic_token": None}
 
+        # 根据 speech tokens, 生成 mel 谱
         speech_mel = self.semantic_fm.infer_chunk(
             xt_chunk=x_t_chunk,
             semantic_tokens_chunk=semantic_token,
@@ -197,6 +198,8 @@ class PrefixStreamingFlowMatchingDetokenizer:
                 ret_wav = reconstructed_wav.float()
         else:
             concat_mel = torch.cat([self.pre_mel, speech_mel], dim=0)
+
+            # 根据 mel 谱，生成 audio wave。 concat_mel.shape = [seq_len, 80]。 80 是业界常用的 Mel 特征维度
             concat_reconstructed_wav = self.vocoder.decode_mel(concat_mel)
 
             if is_final:
