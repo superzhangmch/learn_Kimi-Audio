@@ -178,6 +178,24 @@ class PrefixStreamingFlowMatchingDetokenizer:
         # For the first chunk, I will only return the half chunk wav, and save the res half chunk in history
         # For the rest requests, I will concat the generated wav with the history, output one chunk of the history, save the
 
+        def mel_to_wav_using_griffinlim(mel_tensor):
+            import numpy as np
+            import librosa
+            import librosa.feature
+            import librosa.display
+            import soundfile as sf
+            mel = mel_tensor.to(torch.float32).cpu().numpy().T
+            mel = np.exp(mel)
+            sr = 22050           # 采样率
+            n_fft = 1024         # FFT窗口大小
+            hop_length = 512     # 帧移，建议保持一致
+            win_length = 1024    # 窗口长度
+            n_mels = 80          # Mel维度，与你的输入一致
+            mel_basis = librosa.filters.mel(sr=sr, n_fft=n_fft, n_mels=n_mels)
+            inv_mel_basis = np.linalg.pinv(mel_basis)
+            S = np.dot(inv_mel_basis, mel)  # shape: [n_fft//2+1, time]
+            audio = librosa.griffinlim(S, n_iter=60, hop_length=hop_length, win_length=win_length)
+            sf.write('tmp/reconstructed.wav', audio, sr)
         if self.pre_mel is None:  # first chunk, related to TTFB
             concat_mel = speech_mel
             concat_reconstructed_wav = self.vocoder.decode_mel(concat_mel)
@@ -200,6 +218,7 @@ class PrefixStreamingFlowMatchingDetokenizer:
             concat_mel = torch.cat([self.pre_mel, speech_mel], dim=0)
 
             # 根据 mel 谱，生成 audio wave。 concat_mel.shape = [seq_len, 80]。 80 是业界常用的 Mel 特征维度
+            # mel_to_wav_using_griffinlim(concat_mel) # 这样也能读出来，虽然发音的效果很差，但是听感很清晰
             concat_reconstructed_wav = self.vocoder.decode_mel(concat_mel)
 
             if is_final:
