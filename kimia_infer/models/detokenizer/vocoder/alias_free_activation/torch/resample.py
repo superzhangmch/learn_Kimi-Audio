@@ -20,9 +20,7 @@ class UpSample1d(nn.Module):
         self.pad_right = (
             self.pad * self.stride + (self.kernel_size - self.stride + 1) // 2
         )
-        filter = kaiser_sinc_filter1d(
-            cutoff=0.5 / ratio, half_width=0.6 / ratio, kernel_size=self.kernel_size
-        )
+        filter = kaiser_sinc_filter1d(cutoff=0.5 / ratio, half_width=0.6 / ratio, kernel_size=self.kernel_size) # 这得到的是卷积核矩阵
         self.register_buffer("filter", filter)
 
     # x: [B, C, T]
@@ -30,9 +28,9 @@ class UpSample1d(nn.Module):
         _, C, _ = x.shape
 
         x = F.pad(x, (self.pad, self.pad), mode="replicate")
-        x = self.ratio * F.conv_transpose1d(
-            x, self.filter.expand(C, -1, -1), stride=self.stride, groups=C
-        )
+        x = self.ratio * F.conv_transpose1d(x, 
+                                            self.filter.expand(C, -1, -1), # 这里是 kaiser_sinc_filter1d 的卷积核。通过转置 transpose 卷积完成。
+                                            stride=self.stride, groups=C)
         x = x[..., self.pad_left : -self.pad_right]
 
         return x
