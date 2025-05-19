@@ -86,7 +86,6 @@ class AMPBlock1(torch.nn.Module):
             ]
         )
         # note： convs1, convs2 都是 stride=1 的，且 input_channels = output_chanels, 也就是说，它们都不会改变 input 的 shape
-        # paper 中，是有up-sample， snake 再 down-sample 的。这里代码并没体现这点。
         
         self.convs2.apply(init_weights)
 
@@ -103,6 +102,7 @@ class AMPBlock1(torch.nn.Module):
             Activation1d = CudaActivation1d
         else:
             Activation1d = TorchActivation1d
+        # paper 中，AMP 中的 snake 激活前后有上下采样。这个上下采样都被包装在了 Activation1d 里（CudaActivation1d 或 TorchActivation1d里）
 
         # Activation functions
         if activation == "snake":
