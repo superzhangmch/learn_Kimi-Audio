@@ -23,8 +23,8 @@ class Activation1d(nn.Module):
 
     # x: [B,C,T]
     def forward(self, x):
-        x = self.upsample(x)
+        x = self.upsample(x)     # 上采样，无参的 transposeConv1D 上参样
         x = self.act(x)
-        x = self.downsample(x)
+        x = self.downsample(x)   # 下采样，无参的 Conv1D 下参样
 
         return x
