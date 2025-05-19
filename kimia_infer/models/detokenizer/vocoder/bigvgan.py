@@ -281,7 +281,7 @@ class BigVGAN(
             Conv1d(h.num_mels, h.upsample_initial_channel, 7, 1, padding=3)
         )
 
-        # Define which AMPBlock to use. BigVGAN uses AMPBlock1 as default
+        # Define which AMPBlock to use. BigVGAN uses AMPBlock1 as default （但是看起来 paper中是用了 AMPBlock2）
         if h.resblock == "1":
             resblock_class = AMPBlock1
         elif h.resblock == "2":
