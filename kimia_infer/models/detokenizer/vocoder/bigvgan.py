@@ -86,6 +86,8 @@ class AMPBlock1(torch.nn.Module):
             ]
         )
         # note： convs1, convs2 都是 stride=1 的，且 input_channels = output_chanels, 也就是说，它们都不会改变 input 的 shape
+        # paper 中，是有up-sample， snake 再 down-sample 的。这里代码并没体现这点。
+        
         self.convs2.apply(init_weights)
 
         self.num_layers = len(self.convs1) + len(
@@ -330,15 +332,14 @@ class BigVGAN(
                 self.resblocks.append(resblock_class(h, ch, k, d, activation=h.activation))
 
         # Post-conv
-        activation_post = (
-            Snake(ch, alpha_logscale=h.snake_logscale)
-            if h.activation == "snake"
-            else (
-                SnakeBeta(ch, alpha_logscale=h.snake_logscale)
-                if h.activation == "snakebeta"
-                else None
+        activation_post = (Snake(ch, alpha_logscale=h.snake_logscale)  # snake 乃每个通道走自己独立的 alpha。F_snake = x + 1/alpha * (sin(alpha * x))^2
+                        if h.activation == "snake"
+                        else (
+                            SnakeBeta(ch, alpha_logscale=h.snake_logscale)
+                            if h.activation == "snakebeta"
+                            else None
+                        )
             )
-        )
         if activation_post is None:
             raise NotImplementedError(
                 "activation incorrectly specified. check the config file and look for 'activation'."
