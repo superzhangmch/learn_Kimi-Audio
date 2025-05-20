@@ -354,6 +354,7 @@ class DiTPrefix(nn.Module):
             x = block(
                 x=x,  # x.shape = torch.Size([1, 120, 2304])
                 c=c,  # c.shape = torch.Size([1, 120, 2304])， c = audio_tokens_id_embedding + time_steps_embs
+                      # block 内部： c 转化成 "x * (1 + scale) + shift" 里的 scale、shift，从而参与进 model
                 seq_len=seq_len,
                 cu_seqlens=cu_seqlens,
                 cu_maxlen=cu_maxlen,
@@ -366,6 +367,6 @@ class DiTPrefix(nn.Module):
             )
 
         # x.shape = torch.Size([1, 120, 2304]) c.shape = torch.Size([1, 120, 2304])
-        x = self.final_layer(x, c)  # (N, T, C)
+        x = self.final_layer(x, c)  # (N, T, C)。 final_layer 内部： c 转化成 "x * (1 + scale) + shift" 里的 scale、shift，从而参与进 model
         # x.shape = torch.Size([1, 100, 80]) # 已经变回 mel 谱的 shape 了
         return x
