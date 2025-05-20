@@ -307,10 +307,14 @@ class DiTPrefix(nn.Module):
         condition: (N, T) tensor of semantic tokens
         seq_len: (N,) tensor of sequence lengths
         """
-
+        
+        # condition.shape = torch.Size([1, 120])= [batch_size, seq_len]， 120是可变的，下面的120都是可变的seq length
         condition = self.semantic_token_embedding(condition)  # (N, T, D)
+        # condition.shape = torch.Size([1, 120, 2304])， 2304=256*9
 
+        # x.shape = torch.Size([1, 120, 80])
         x = self.input_linear(x)
+        # x.shape = torch.Size([1, 120, 2304])
 
         if self.position_embedding is not None:
             position_emb = self.position_embedding(position_ids)
@@ -333,8 +337,8 @@ class DiTPrefix(nn.Module):
         else:
             rotary_pos_emb = None
 
-        t = self.t_embedder(t)  # (N, D)
-        c = t.unsqueeze(1) + condition  # (N, T, D)
+        t = self.t_embedder(t)          # (N, D)，           t.shape = torch.Size([1, 2304])
+        c = t.unsqueeze(1) + condition  # (N, T, D), condition.shape = torch.Size([1, 120, 2304])
 
         for block_idx, block in enumerate(self.blocks):
             # x = block(x, c, attn_mask)  # (N, T, D)
@@ -348,8 +352,8 @@ class DiTPrefix(nn.Module):
                 incr = None
 
             x = block(
-                x=x,
-                c=c,
+                x=x,  # x.shape = torch.Size([1, 120, 2304])
+                c=c,  # c.shape = torch.Size([1, 120, 2304])， c = audio_tokens_id_embedding + time_steps_embs
                 seq_len=seq_len,
                 cu_seqlens=cu_seqlens,
                 cu_maxlen=cu_maxlen,
@@ -361,5 +365,7 @@ class DiTPrefix(nn.Module):
                 nopadding=nopadding,
             )
 
+        # x.shape = torch.Size([1, 120, 2304]) c.shape = torch.Size([1, 120, 2304])
         x = self.final_layer(x, c)  # (N, T, C)
+        # x.shape = torch.Size([1, 100, 80]) # 已经变回 mel 谱的 shape 了
         return x
