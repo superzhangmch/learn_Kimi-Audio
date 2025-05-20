@@ -71,17 +71,20 @@ class Attention(nn.Module):
         self,
         x: torch.Tensor,
         seq_len,
-        cu_seqlens,
+        cu_seqlens,    # cu_seqlens = torch.cumsum(self.seq_len, dim=0)，见 ./kimia_infer/models/detokenizer/flow_matching/ode_wrapper.py， 即 [1,2,3,4,5] => [1, 3, 6, 10, 15]
+                       #   cu_seqlens 和 cu_seqlens_k 是为了支持 变长序列批处理（variable-length batching），也就是：把一个 batch 中 多个不同长度的序列 拼接成一个长张量，并用 cu_seqlens 来记录每条序列的起始位置。
+                       #   这是 FlashAttention 中使用的一种高效 batch 表示方式。
         max_seqlen,
-        cu_seqlens_k,
+        cu_seqlens_k,  # 用于flash-attention
         max_seqlen_k,
         rotary_pos_emb=None,
         incremental_state=None,
         nopadding=True,
     ) -> torch.Tensor:
         B, N, C = x.shape
+        # 因为 x.shape = (batch_size, seq_len, fea_dim), 所以 attention 内部是像 LLM 的 tokens 之间作 attention 一样做的
 
-        if self.fused_attn:
+        if self.fused_attn: ##  = flash_attention
             if nopadding:
                 qkv = self.qkv(x)
                 qkv = qkv.view(B * N, self.num_heads * 3, self.head_dim)
@@ -210,7 +213,7 @@ class DiTBlock(nn.Module):
         hidden_size,
         num_heads,
         mlp_ratio=4.0,
-        ffn_type="conv1d_conv1d",
+        ffn_type="conv1d_conv1d", # 但是并不用它，而是用的 valilla_mlp
         ffn_gated_glu=True,
         ffn_act_layer="gelu",
         ffn_conv_kernel_size=5,
@@ -256,11 +259,15 @@ class DiTBlock(nn.Module):
         incremental_state=None,
         nopadding=True,
     ):
+        # x.shape = torch.Size([1, 120, 2304]) c.shape = torch.Size([1, 120, 2304])
+        
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (
-            self.adaLN_modulation(c).chunk(6, dim=2)
+            self.adaLN_modulation(c).chunk(6, dim=2)    # Silu + linear， 条件c只用于这里
         )
 
-        x_ = modulate(self.norm1(x), shift_msa, scale_msa)
+        ############  ATTN ##############
+        
+        x_ = modulate(self.norm1(x), shift_msa, scale_msa)  # => x * (1 + scale) + shift， scale shift来自c
 
         if incremental_state is not None:
             if "attn_kvcache" not in incremental_state:
@@ -269,8 +276,7 @@ class DiTBlock(nn.Module):
         else:
             inc_attn = None
 
-        x_ = self.attn(
-            x_,
+        x_ = self.attn(x_,   # x.shape = (B, N, C), 所以 attn 是N的不同元素之间做的，也就是类似 LLM 的不同token之间那样。
             seq_len=seq_len,
             cu_seqlens=cu_seqlens,
             max_seqlen=cu_maxlen,
@@ -284,14 +290,16 @@ class DiTBlock(nn.Module):
         if not nopadding:
             x_ = x_ * mask[:, :, None]
 
-        x = x + gate_msa * x_
+        x = x + gate_msa * x_ # x 是原始input x， gate_msa 来自c
 
-        x_ = modulate(self.norm2(x), shift_mlp, scale_mlp)
+        ############  MLP ##############
+        
+        x_ = modulate(self.norm2(x), shift_mlp, scale_mlp) # shift_* 来自c
 
         x_ = self.mlp(x_)
 
         if not nopadding:
             x_ = x_ * mask[:, :, None]
 
-        x = x + gate_mlp * x_
+        x = x + gate_mlp * x_ # gate_mlp 来自 c
         return x
