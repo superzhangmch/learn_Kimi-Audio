@@ -4,6 +4,8 @@
     <li>https://github.com/superzhangmch/learn_Kimi-Audio/blob/master/Kimi-Audio-7B-Instruct/modeling_moonshot_kimia.py</li> 
     <li>https://github.com/superzhangmch/learn_Kimi-Audio/blob/master/kimia_infer/models/detokenizer/__init__.py</li>
     <li>bigv-Gan: https://github.com/superzhangmch/learn_Kimi-Audio/blob/master/kimia_infer/models/detokenizer/vocoder/bigvgan.py </li>
+    <li>flow-match: https://github.com/superzhangmch/learn_Kimi-Audio/edit/master/kimia_infer/models/detokenizer/flow_matching/dit_block.py</li>
+    <li>flow-match: https://github.com/superzhangmch/learn_Kimi-Audio/blob/master/kimia_infer/models/detokenizer/flow_matching/model.py</li>
 </ul>
 <hr>
 <p align="center">
