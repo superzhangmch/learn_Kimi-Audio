@@ -103,6 +103,7 @@ class AMPBlock1(torch.nn.Module):
         else:
             Activation1d = TorchActivation1d
         # paper 中，AMP 中的 snake 激活前后有上下采样。这个上下采样都被包装在了 Activation1d 里（CudaActivation1d 或 TorchActivation1d里）
+        # 且上下采样针对的是时间维度
 
         # Activation functions
         if activation == "snake":
